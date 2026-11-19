@@ -8,7 +8,7 @@ ASP.NET Core 10 (Razor Pages) app that lists vet visits for users and their pets
 User 1--* Pet 1--* VetVisit *--1 Veterinarian
 ```
 
-The app seeds about 5,000 users, 12,000 pets, 40 vets and 60,000 visits into SQLite on first start.
+Data lives in PostgreSQL. The `postgres` compose service restores `db/init/pawtrack.sql.gz` (a `pg_dump` with about 5,000 users, 12,500 pets, 40 vets and 56,000 visits) the first time it starts with an empty volume.
 
 | Page / endpoint | Query |
 |---|---|
@@ -21,18 +21,33 @@ The LINQ queries are in `src/PawTrack.Web/Queries/VetVisitQueries.cs`. Results a
 
 ## Running locally
 
-Dev (needs a Redis instance on `localhost:6379`):
+Dev (Postgres on `localhost:5432` and Redis on `localhost:6379`):
 
 ```sh
-docker run -d -p 6379:6379 redis:7.4-alpine
+docker compose up -d postgres redis
 dotnet run --project src/PawTrack.Web
 ```
 
-Production-like (app and Redis in Docker):
+Production-like (app, Postgres and Redis in Docker):
 
 ```sh
 docker compose up -d --build
 # http://localhost:8080
+```
+
+### Database backup
+
+The backup is only restored into an empty volume. To reset the database to the backup:
+
+```sh
+docker compose down -v
+docker compose up -d
+```
+
+To replace the backup with the current database contents:
+
+```sh
+docker compose exec postgres pg_dump -U pawtrack -d pawtrack --no-owner --no-privileges | gzip -9 > db/init/pawtrack.sql.gz
 ```
 
 ## Load testing

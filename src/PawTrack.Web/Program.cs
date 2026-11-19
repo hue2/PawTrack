@@ -8,18 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 
 builder.Services.AddDbContext<PawTrackDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("PawTrack")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("PawTrack")));
 builder.Services.AddScoped<VetVisitQueries>();
 builder.Services.AddRedisCache(builder.Configuration);
 
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<PawTrackDbContext>();
-    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(db.Database.GetDbConnection().DataSource))!);
-    await SeedData.EnsureSeededAsync(db, app.Logger);
-}
 
 if (!app.Environment.IsDevelopment())
 {

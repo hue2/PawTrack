@@ -8,10 +8,32 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Redis: redis:6379
-      ConnectionStrings__PawTrack: Data Source=/app/data/pawtrack.db
+      ConnectionStrings__PawTrack: Host=postgres;Port=5432;Database=pawtrack;Username=pawtrack;Password=pawtrack
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pawtrack
+      POSTGRES_USER: pawtrack
+      POSTGRES_PASSWORD: pawtrack
+    ports:
+      - "5432:5432"
+    volumes:
+      # Scripts in this folder run only when the data volume is empty, restoring the backup on first start.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Checks over TCP: the init scripts run against a socket-only server, so this passes only after the restore finishes.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U pawtrack -d pawtrack"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
 
   redis:
     image: redis:7.4-alpine
@@ -34,3 +56,6 @@ services:
     command: ["run", "/scripts/browse-visits.js"]
     depends_on:
       - web
+
+volumes:
+  pgdata:
