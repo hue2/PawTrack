@@ -1,0 +1,50 @@
+@page
+@model OwnersModel
+@{
+    ViewData["Title"] = "Owners";
+    string[] cities = ["Austin", "Denver", "Seattle", "Portland", "Chicago", "Boston", "Atlanta", "Phoenix", "San Diego", "Miami"];
+}
+
+<h1 class="h3">Owners</h1>
+<p class="text-muted">@Model.Owners.TotalCount.ToString("N0") owners &middot; page @Model.Owners.Page of @Model.Owners.TotalPages</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <select name="city" class="form-select form-select-sm">
+            <option value="">All cities</option>
+            @foreach (var c in cities)
+            {
+                <option value="@c" selected="@(Model.City == c)">@c</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Filter</button></div>
+</form>
+
+<partial name="_Pager" model="(Model.Owners.Page, Model.Owners.TotalPages, (string?)null, Model.City)" />
+
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Owner</th><th>City</th><th class="text-end">Pets</th><th class="text-end">Visits</th>
+                <th class="text-end">Total spend</th><th>Last visit</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in Model.Owners.Items)
+            {
+                <tr>
+                    <td>@o.OwnerName</td>
+                    <td>@o.City</td>
+                    <td class="text-end">@o.PetCount</td>
+                    <td class="text-end">@o.VisitCount</td>
+                    <td class="text-end">@o.TotalSpend.ToString("C")</td>
+                    <td>@(o.LastVisit?.ToString("yyyy-MM-dd") ?? "-")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<partial name="_Pager" model="(Model.Owners.Page, Model.Owners.TotalPages, (string?)null, Model.City)" />

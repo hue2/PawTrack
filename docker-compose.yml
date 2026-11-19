@@ -1,0 +1,36 @@
+name: pawtrack
+
+services:
+  web:
+    build: ./src/PawTrack.Web
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__PawTrack: Data Source=/app/data/pawtrack.db
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--maxclients", "50"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: ["loadtest"]
+    volumes:
+      - ./loadtest:/scripts:ro
+    environment:
+      BASE_URL: http://web:8080
+    command: ["run", "/scripts/browse-visits.js"]
+    depends_on:
+      - web

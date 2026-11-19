@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PawTrack.Web/PawTrack.Web.csproj" />
+  </Folder>
+</Solution>

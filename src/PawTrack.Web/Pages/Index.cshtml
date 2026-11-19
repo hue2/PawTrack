@@ -1,0 +1,64 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Vet visits";
+    string[] species = ["Dog", "Cat", "Rabbit", "Bird", "Reptile"];
+    string[] cities = ["Austin", "Denver", "Seattle", "Portland", "Chicago", "Boston", "Atlanta", "Phoenix", "San Diego", "Miami"];
+}
+
+<h1 class="h3">Vet visits</h1>
+<p class="text-muted">@Model.Visits.TotalCount.ToString("N0") visits &middot; page @Model.Visits.Page of @Model.Visits.TotalPages</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <select name="species" class="form-select form-select-sm">
+            <option value="">All species</option>
+            @foreach (var s in species)
+            {
+                <option value="@s" selected="@(Model.Species == s)">@s</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="city" class="form-select form-select-sm">
+            <option value="">All cities</option>
+            @foreach (var c in cities)
+            {
+                <option value="@c" selected="@(Model.City == c)">@c</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Filter</button></div>
+</form>
+
+<partial name="_Pager" model="(Model.Visits.Page, Model.Visits.TotalPages, Model.Species, Model.City)" />
+
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Date</th><th>Owner</th><th>City</th><th>Pet</th><th>Species / breed</th>
+                <th>Vet</th><th>Clinic</th><th>Reason</th><th>Diagnosis</th><th class="text-end">Cost</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var v in Model.Visits.Items)
+            {
+                <tr>
+                    <td>@v.VisitDate.ToString("yyyy-MM-dd")</td>
+                    <td>@v.OwnerName<br /><small class="text-muted">@v.OwnerEmail</small></td>
+                    <td>@v.City</td>
+                    <td>@v.PetName</td>
+                    <td>@v.Species<br /><small class="text-muted">@v.Breed</small></td>
+                    <td>@v.VetName</td>
+                    <td>@v.Clinic</td>
+                    <td>@v.Reason</td>
+                    <td>@v.Diagnosis</td>
+                    <td class="text-end">@v.Cost.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<partial name="_Pager" model="(Model.Visits.Page, Model.Visits.TotalPages, Model.Species, Model.City)" />
