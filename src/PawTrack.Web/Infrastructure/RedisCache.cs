@@ -8,21 +8,39 @@ public interface ICacheStore
     Task<T> GetOrSetAsync<T>(string key, TimeSpan ttl, Func<Task<T>> factory);
 }
 
-public class RedisCache(IConnectionMultiplexer redis, ILogger<RedisCache> logger) : ICacheStore
+public class RedisCache(IServiceProvider services, ILogger<RedisCache> logger) : ICacheStore
 {
     public async Task<T> GetOrSetAsync<T>(string key, TimeSpan ttl, Func<Task<T>> factory)
     {
-        var db = redis.GetDatabase();
-
-        var cached = await db.StringGetAsync(key);
-        if (cached.HasValue)
+        IDatabase db;
+        try
         {
-            return JsonSerializer.Deserialize<T>(cached.ToString())!;
+            // Resolved here rather than injected so a failed connection falls back to the database instead of failing the request.
+            db = services.GetRequiredService<IConnectionMultiplexer>().GetDatabase();
+
+            var cached = await db.StringGetAsync(key);
+            if (cached.HasValue)
+            {
+                return JsonSerializer.Deserialize<T>(cached.ToString())!;
+            }
+        }
+        catch (Exception ex) when (ex is RedisException or RedisTimeoutException)
+        {
+            logger.LogWarning("Redis unavailable, reading {Key} from the database: {Message}", key, ex.Message);
+            return await factory();
         }
 
         logger.LogDebug("Cache miss for {Key}", key);
         var value = await factory();
-        await db.StringSetAsync(key, JsonSerializer.Serialize(value), ttl);
+        try
+        {
+            await db.StringSetAsync(key, JsonSerializer.Serialize(value), ttl);
+        }
+        catch (Exception ex) when (ex is RedisException or RedisTimeoutException)
+        {
+            logger.LogWarning("Redis unavailable, not caching {Key}: {Message}", key, ex.Message);
+        }
+
         return value;
     }
 }

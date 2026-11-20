@@ -7,8 +7,8 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Redis: redis:6379
-      ConnectionStrings__PawTrack: Host=postgres;Port=5432;Database=pawtrack;Username=pawtrack;Password=pawtrack
+      ConnectionStrings__Redis: redis:6379,connectTimeout=1000
+      ConnectionStrings__PawTrack: Host=postgres;Port=5432;Database=pawtrack;Username=pawtrack;Password=pawtrack;Maximum Pool Size=15;Timeout=3;Command Timeout=10
     depends_on:
       postgres:
         condition: service_healthy
@@ -17,10 +17,12 @@ services:
 
   postgres:
     image: postgres:17-alpine
+    shm_size: 1gb
     environment:
       POSTGRES_DB: pawtrack
       POSTGRES_USER: pawtrack
       POSTGRES_PASSWORD: pawtrack
+      PAWTRACK_SCALE: ${PAWTRACK_SCALE:-50}
     ports:
       - "5432:5432"
     volumes:
@@ -33,7 +35,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-      start_period: 30s
+      start_period: 180s
 
   redis:
     image: redis:7.4-alpine

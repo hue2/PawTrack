@@ -7,21 +7,35 @@ const SPECIES = ['', 'Dog', 'Cat', 'Rabbit', 'Bird', 'Reptile'];
 const CITIES = ['', 'Austin', 'Denver', 'Seattle', 'Portland', 'Chicago', 'Boston'];
 
 export const options = {
-  stages: [
-    { duration: '20s', target: 20 },
-    { duration: '40s', target: 150 },
-    { duration: '30s', target: 150 },
-    { duration: '10s', target: 0 },
-  ],
+  scenarios: {
+    // Arrival rate (iterations/s) keeps traffic coming when responses slow down, like real users, so a slow database piles up instead of throttling the test.
+    browse: {
+      executor: 'ramping-arrival-rate',
+      startRate: 10,
+      timeUnit: '1s',
+      preAllocatedVUs: 50,
+      maxVUs: 400,
+      stages: [
+        // Warm-up at a low rate so the cache fills before load increases.
+        { duration: '20s', target: 10 },
+        { duration: '40s', target: 200 },
+        { duration: '30s', target: 200 },
+        { duration: '10s', target: 0 },
+      ],
+    },
+  },
   thresholds: {
-    http_req_failed: ['rate<0.001'],
+    http_req_failed: [{ threshold: 'rate<0.001', abortOnFail: true, delayAbortEval: '5s' }],
+    // Latency still fails the run but doesn't abort it, so the test continues until requests start erroring.
     http_req_duration: ['p(95)<500', 'p(99)<1000'],
   },
 };
 
+const PARAMS = { timeout: '5s' };
+
 export function setup() {
-  for (let i = 0; i < 60; i++) {
-    const res = http.get(`${BASE_URL}/health`);
+  for (let i = 0; i < 15; i++) {
+    const res = http.get(`${BASE_URL}/health`, PARAMS);
     if (res.status === 200) return;
     sleep(2);
   }
@@ -37,13 +51,13 @@ export default function () {
   const species = pick(SPECIES);
   const city = pick(CITIES);
 
-  const visits = http.get(`${BASE_URL}/?p=${page}&species=${species}&city=${city}`, { tags: { name: 'visits page' } });
+  const visits = http.get(`${BASE_URL}/?p=${page}&species=${species}&city=${city}`, { ...PARAMS, tags: { name: 'visits page' } });
   check(visits, { 'visits page 200': (r) => r.status === 200 });
 
-  const owners = http.get(`${BASE_URL}/Owners?p=${page}&city=${city}`, { tags: { name: 'owners page' } });
+  const owners = http.get(`${BASE_URL}/Owners?p=${page}&city=${city}`, { ...PARAMS, tags: { name: 'owners page' } });
   check(owners, { 'owners page 200': (r) => r.status === 200 });
 
-  const api = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=100&species=${species}`, { tags: { name: 'visits api' } });
+  const api = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=100&species=${species}`, { ...PARAMS, tags: { name: 'visits api' } });
   check(api, { 'visits api 200': (r) => r.status === 200 });
 
   sleep(Math.random() * 0.5);
