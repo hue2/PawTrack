@@ -51,10 +51,11 @@ export default function () {
   const species = pick(SPECIES);
   const city = pick(CITIES);
 
-  const visits = http.get(`${BASE_URL}/?p=${page}&species=${species}&city=${city}`, { ...PARAMS, tags: { name: 'visits page' } });
+  // The React pages load their data from these API calls (500 rows per page).
+  const visits = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=500&species=${species}&city=${city}`, { ...PARAMS, tags: { name: 'visits page' } });
   check(visits, { 'visits page 200': (r) => r.status === 200 });
 
-  const owners = http.get(`${BASE_URL}/Owners?p=${page}&city=${city}`, { ...PARAMS, tags: { name: 'owners page' } });
+  const owners = http.get(`${BASE_URL}/api/owners?page=${page}&pageSize=500&city=${city}`, { ...PARAMS, tags: { name: 'owners page' } });
   check(owners, { 'owners page 200': (r) => r.status === 200 });
 
   const api = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=100&species=${species}`, { ...PARAMS, tags: { name: 'visits api' } });

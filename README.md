@@ -1,6 +1,6 @@
 # PawTrack
 
-ASP.NET Core 10 (Razor Pages) app that lists vet visits for users and their pets.
+App that lists vet visits for users and their pets: a React frontend (`src/PawTrack.Web/ClientApp`) on an ASP.NET Core 10 API.
 
 ## Data model
 
@@ -13,23 +13,30 @@ Data lives in PostgreSQL. The first time the `postgres` compose service starts w
 1. restores `db/init/01-pawtrack.sql.gz`, a `pg_dump` with about 5,000 users, 12,500 pets, 40 vets and 56,000 visits;
 2. runs `db/init/02-scale.sh`, which copies that data `PAWTRACK_SCALE` times (default 50: about 250,000 users, 630,000 pets and 2.8 million visits, 570 MB). Startup takes about a minute.
 
-| Page / endpoint | Query |
-|---|---|
-| `/` | Visits joined with pets, owners and vets, filterable by species and city, 500 rows per page |
-| `/Owners` | Owners joined with pets and visits, grouped by owner (pet count, visit count, total spend, last visit) |
-| `/api/visits`, `/api/owners` | The same queries returned as JSON |
-| `/health` | Liveness check (does not touch Redis) |
+| Endpoint | Query | Used by |
+|---|---|---|
+| `/api/visits` | Visits joined with pets, owners and vets, filterable by `species` and `city`, paged with `page` and `pageSize` (max 1000) | Visits page (`/`), 500 rows per page |
+| `/api/owners` | Owners joined with pets and visits, grouped by owner (pet count, visit count, total spend, last visit), filterable by `city` | Owners page (`/owners`), 500 rows per page |
+| `/health` | Liveness check (does not touch Redis) | |
+
+Any other path that isn't a file returns the React app's `index.html`, so client-side routes work when loaded directly.
 
 The LINQ queries are in `src/PawTrack.Web/Queries/VetVisitQueries.cs`. Results are cached in Redis for one minute through `ICacheStore`. If Redis can't be reached, requests read from the database instead.
 
 ## Running locally
 
-Dev (Postgres on `localhost:5432` and Redis on `localhost:6379`):
+Dev (needs Node 22 and the .NET 10 SDK):
 
 ```sh
 docker compose up -d postgres redis
-dotnet run --project src/PawTrack.Web
+dotnet run --project src/PawTrack.Web     # API on http://localhost:5064
+
+cd src/PawTrack.Web/ClientApp
+npm install
+npm run dev                               # http://localhost:5173, proxies /api to the API
 ```
+
+`npm run build` type-checks the app and builds it into `src/PawTrack.Web/wwwroot`, which `dotnet run` then serves on port 5064. The Docker image does this build itself.
 
 Production-like (app, Postgres and Redis in Docker):
 
@@ -64,7 +71,7 @@ k6 runs as a compose service under the `loadtest` profile, so it doesn't need a 
 docker compose --profile loadtest run --rm k6
 ```
 
-The script is `loadtest/browse-visits.js`. Each iteration requests the visits page, the owners page and the visits API. Traffic arrives at a fixed rate rather than from a fixed number of users, so it keeps coming when responses slow down:
+The script is `loadtest/browse-visits.js`. Each iteration makes the API calls the visits and owners pages make (500 rows each), plus a smaller visits API call (100 rows). Traffic arrives at a fixed rate rather than from a fixed number of users, so it keeps coming when responses slow down:
 
 | Time | Iterations per second | Purpose |
 |---|---|---|
