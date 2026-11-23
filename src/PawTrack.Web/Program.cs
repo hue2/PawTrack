@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PawTrack.Web.Data;
+using PawTrack.Web.Domain;
 using PawTrack.Web.Infrastructure;
 using PawTrack.Web.Queries;
 
@@ -10,6 +11,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddDbContext<PawTrackDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("PawTrack")));
 builder.Services.AddScoped<VetVisitQueries>();
+builder.Services.AddScoped<AppointmentQueries>();
 builder.Services.AddRedisCache(builder.Configuration);
 
 var app = builder.Build();
@@ -42,6 +44,26 @@ api.MapGet("/owners", (int? page, int? pageSize, string? city, ICacheStore cache
     city = NullIfEmpty(city);
     return cache.GetOrSetAsync($"owners:{p}:{size}:{city}", TimeSpan.FromMinutes(1),
         () => queries.GetOwnerSummariesAsync(p, size, city, ct));
+});
+
+// status=upcoming (default) lists confirmed appointments; status=pending lists requests awaiting confirmation.
+api.MapGet("/appointments", async (string? status, int? page, int? pageSize, ICacheStore cache, AppointmentQueries queries, CancellationToken ct) =>
+{
+    AppointmentStatus? apptStatus = NullIfEmpty(status)?.ToLowerInvariant() switch
+    {
+        null or "upcoming" => AppointmentStatus.Confirmed,
+        "pending" => AppointmentStatus.Pending,
+        _ => null,
+    };
+    if (apptStatus is not { } s)
+    {
+        return Results.BadRequest(new { error = "status must be 'upcoming' or 'pending'." });
+    }
+
+    var p = Math.Max(page ?? 1, 1);
+    var size = Math.Clamp(pageSize ?? 250, 1, 1000);
+    return Results.Ok(await cache.GetOrSetAsync($"appointments:{s}:{p}:{size}", TimeSpan.FromMinutes(1),
+        () => queries.GetFutureAsync(s, p, size, ct)));
 });
 
 api.MapFallback(() => Results.NotFound());

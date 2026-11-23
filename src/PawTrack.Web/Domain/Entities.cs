@@ -48,3 +48,23 @@ public class VetVisit
     public Pet Pet { get; set; } = null!;
     public Veterinarian Veterinarian { get; set; } = null!;
 }
+
+public enum AppointmentStatus
+{
+    Pending,
+    Confirmed,
+}
+
+public class Appointment
+{
+    public int Id { get; set; }
+    public int PetId { get; set; }
+    public int VeterinarianId { get; set; }
+    public DateTime ScheduledAt { get; set; }
+    public DateTime RequestedAt { get; set; }
+    public required string Reason { get; set; }
+    public AppointmentStatus Status { get; set; }
+
+    public Pet Pet { get; set; } = null!;
+    public Veterinarian Veterinarian { get; set; } = null!;
+}

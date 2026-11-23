@@ -25,6 +25,21 @@ export interface VisitRow {
   cost: number;
 }
 
+export interface AppointmentRow {
+  appointmentId: number;
+  scheduledAt: string;
+  requestedAt: string;
+  ownerName: string;
+  ownerEmail: string;
+  city: string;
+  petName: string;
+  species: string;
+  breed: string;
+  vetName: string;
+  clinic: string;
+  reason: string;
+}
+
 export interface OwnerSummaryRow {
   userId: number;
   ownerName: string;

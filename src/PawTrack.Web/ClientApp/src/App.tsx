@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import VisitsPage from './pages/VisitsPage';
 import OwnersPage from './pages/OwnersPage';
+import AppointmentsPage from './pages/AppointmentsPage';
 
 const titles: Record<string, string> = {
-  '/': 'Vet visits',
+  '/': 'Past visits & invoices',
+  '/appointments': 'Appointments',
   '/owners': 'Owners',
 };
 
@@ -23,7 +25,10 @@ export default function App() {
             <NavLink className="navbar-brand" to="/">PawTrack</NavLink>
             <ul className="navbar-nav flex-grow-1">
               <li className="nav-item">
-                <NavLink className="nav-link" to="/" end>Visits</NavLink>
+                <NavLink className="nav-link" to="/" end>Past visits</NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink className="nav-link" to="/appointments">Appointments</NavLink>
               </li>
               <li className="nav-item">
                 <NavLink className="nav-link" to="/owners">Owners</NavLink>
@@ -36,6 +41,7 @@ export default function App() {
         <main role="main" className="pb-3">
           <Routes>
             <Route path="/" element={<VisitsPage />} />
+            <Route path="/appointments" element={<AppointmentsPage />} />
             <Route path="/owners" element={<OwnersPage />} />
             <Route path="*" element={<h1 className="h3">Page not found</h1>} />
           </Routes>

@@ -11,11 +11,13 @@ User 1--* Pet 1--* VetVisit *--1 Veterinarian
 Data lives in PostgreSQL. The first time the `postgres` compose service starts with an empty volume, it:
 
 1. restores `db/init/01-pawtrack.sql.gz`, a `pg_dump` with about 5,000 users, 12,500 pets, 40 vets and 56,000 visits;
-2. runs `db/init/02-scale.sh`, which copies that data `PAWTRACK_SCALE` times (default 50: about 250,000 users, 630,000 pets and 2.8 million visits, 570 MB). Startup takes about a minute.
+2. runs `db/init/02-scale.sh`, which copies that data `PAWTRACK_SCALE` times (default 50: about 250,000 users, 630,000 pets and 2.8 million visits, 570 MB). Startup takes about a minute;
+3. runs `db/init/03-appointments.sql`, which creates the `Appointments` table and gives about one in five pets an appointment in the next 60 days (about 70% confirmed, 30% pending). Appointments are generated relative to the current date rather than stored in the backup, so they don't go stale.
 
 | Endpoint | Query | Used by |
 |---|---|---|
-| `/api/visits` | Visits joined with pets, owners and vets, filterable by `species` and `city`, paged with `page` and `pageSize` (max 1000) | Visits page (`/`), 500 rows per page |
+| `/api/visits` | Past visits joined with pets, owners and vets, filterable by `species` and `city`, paged with `page` and `pageSize` (max 1000) | Past visits & invoices page (`/`), 500 rows per page |
+| `/api/appointments` | Future appointments joined with pets, owners and vets, soonest first. `status=upcoming` (default) for confirmed, `status=pending` for awaiting confirmation | Appointments page (`/appointments`), one tab per status, 500 rows per page |
 | `/api/owners` | Owners joined with pets and visits, grouped by owner (pet count, visit count, total spend, last visit), filterable by `city` | Owners page (`/owners`), 500 rows per page |
 | `/health` | Liveness check (does not touch Redis) | |
 
@@ -60,7 +62,7 @@ To replace the backup with the current database contents, start from an unscaled
 docker compose down -v
 PAWTRACK_SCALE=1 docker compose up -d postgres
 # make your changes, then:
-docker compose exec postgres pg_dump -U pawtrack -d pawtrack --no-owner --no-privileges | gzip -9 > db/init/01-pawtrack.sql.gz
+docker compose exec postgres pg_dump -U pawtrack -d pawtrack --no-owner --no-privileges --exclude-table='"Appointments"' | gzip -9 > db/init/01-pawtrack.sql.gz
 ```
 
 ## Load testing

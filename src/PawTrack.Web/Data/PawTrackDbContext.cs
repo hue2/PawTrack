@@ -9,6 +9,7 @@ public class PawTrackDbContext(DbContextOptions<PawTrackDbContext> options) : Db
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Veterinarian> Veterinarians => Set<Veterinarian>();
     public DbSet<VetVisit> VetVisits => Set<VetVisit>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,14 @@ public class PawTrackDbContext(DbContextOptions<PawTrackDbContext> options) : Db
             e.HasOne(v => v.Veterinarian).WithMany(v => v.Visits).HasForeignKey(v => v.VeterinarianId);
             e.Property(v => v.Cost).HasPrecision(10, 2);
             e.HasIndex(v => v.VisitDate);
+        });
+
+        modelBuilder.Entity<Appointment>(e =>
+        {
+            e.HasOne(a => a.Pet).WithMany().HasForeignKey(a => a.PetId);
+            e.HasOne(a => a.Veterinarian).WithMany().HasForeignKey(a => a.VeterinarianId);
+            e.Property(a => a.Status).HasConversion<string>();
+            e.HasIndex(a => new { a.Status, a.ScheduledAt });
         });
     }
 }

@@ -20,6 +20,20 @@ public record VisitRow(
     string Diagnosis,
     decimal Cost);
 
+public record AppointmentRow(
+    int AppointmentId,
+    DateTime ScheduledAt,
+    DateTime RequestedAt,
+    string OwnerName,
+    string OwnerEmail,
+    string City,
+    string PetName,
+    string Species,
+    string Breed,
+    string VetName,
+    string Clinic,
+    string Reason);
+
 public record OwnerSummaryRow(
     int UserId,
     string OwnerName,

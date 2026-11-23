@@ -11,10 +11,10 @@ export default function VisitsPage() {
 
   return (
     <>
-      <h1 className="h3">Vet visits</h1>
+      <h1 className="h3">Past visits &amp; invoices</h1>
       {state.status === 'success' && (
         <p className="text-muted">
-          {formatNumber(state.data.totalCount)} visits &middot; page {state.data.page} of {state.data.totalPages}
+          {formatNumber(state.data.totalCount)} past visits &middot; page {state.data.page} of {state.data.totalPages}
         </p>
       )}
 
@@ -32,7 +32,7 @@ export default function VisitsPage() {
               <thead>
                 <tr>
                   <th>Date</th><th>Owner</th><th>City</th><th>Pet</th><th>Species / breed</th>
-                  <th>Vet</th><th>Clinic</th><th>Reason</th><th>Diagnosis</th><th className="text-end">Cost</th>
+                  <th>Vet</th><th>Clinic</th><th>Reason</th><th>Diagnosis</th><th className="text-end">Invoice</th>
                 </tr>
               </thead>
               <tbody>
