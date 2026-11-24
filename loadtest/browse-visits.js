@@ -4,10 +4,11 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
-const SPECIES = ['', 'Dog', 'Cat', 'Rabbit', 'Bird', 'Reptile'];
-const CITIES = ['', 'Austin', 'Denver', 'Seattle', 'Portland', 'Chicago', 'Boston'];
-// The page size picker offers a few fixed choices, so requests share cache keys the way real users do.
-const PAGE_SIZES = [25, 50, 100];
+// Hot keys: most users land on the first few pages with the default page size and no filters, so traffic concentrates
+// on a handful of cache keys. When one of them is missing (cold start, or expiry after the 1-minute TTL), every request
+// that arrives during the ~1s database query misses the same key. Without stampede protection each runs its own query.
+const PAGES = [1, 2, 3];
+const PAGE_SIZE = 100;
 // Upcoming is cached in Redis for 30s; pending always reads the database.
 const APPOINTMENT_STATUSES = ['upcoming', 'pending'];
 
@@ -26,19 +27,15 @@ export const options = {
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
   scenarios: {
     // Arrival rate (iterations/s) keeps traffic coming when responses slow down, like real users, so a slow database piles up instead of throttling the test.
+    // Full rate from the first second with no warm-up, and longer than the 1-minute TTL, so the run hits two stampedes:
+    // the cold start and the expiry at ~60s. Flush Redis before each run (redis-cli flushall) to start cold.
     browse: {
-      executor: 'ramping-arrival-rate',
-      startRate: 10,
+      executor: 'constant-arrival-rate',
+      rate: 40,
       timeUnit: '1s',
-      preAllocatedVUs: 50,
+      duration: '90s',
+      preAllocatedVUs: 100,
       maxVUs: 400,
-      stages: [
-        // Warm-up at a low rate so the cache fills before load increases.
-        { duration: '10s', target: 50 },
-        { duration: '20s', target: 200 },
-        { duration: '30s', target: 200 },
-        { duration: '10s', target: 0 },
-      ],
     },
   },
   thresholds: {
@@ -65,23 +62,20 @@ function pick(arr) {
 }
 
 export default function () {
-  const page = Math.floor(Math.random() * 10) + 1;
-  const species = pick(SPECIES);
-  const city = pick(CITIES);
-  const pageSize = pick(PAGE_SIZES);
+  const page = pick(PAGES);
 
-  // The React pages load their data from these API calls (500 rows per page).
-  const visits = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=${pageSize}&species=${species}&city=${city}`, { ...PARAMS, tags: { name: 'visits page' } });
+  // The React pages load their data from these API calls.
+  const visits = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=${PAGE_SIZE}`, { ...PARAMS, tags: { name: 'visits page' } });
   check(visits, { 'visits page 200': (r) => r.status === 200 });
 
-  const owners = http.get(`${BASE_URL}/api/owners?page=${page}&pageSize=${pageSize}&city=${city}`, { ...PARAMS, tags: { name: 'owners page' } });
+  const owners = http.get(`${BASE_URL}/api/owners?page=${page}&pageSize=${PAGE_SIZE}`, { ...PARAMS, tags: { name: 'owners page' } });
   check(owners, { 'owners page 200': (r) => r.status === 200 });
 
-  const api = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=${pageSize}&species=${species}`, { ...PARAMS, tags: { name: 'visits api' } });
+  const api = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=${PAGE_SIZE}&species=Dog`, { ...PARAMS, tags: { name: 'visits api' } });
   check(api, { 'visits api 200': (r) => r.status === 200 });
 
   const status = pick(APPOINTMENT_STATUSES);
-  const appointments = http.get(`${BASE_URL}/api/appointments?status=${status}&page=${page}&pageSize=${pageSize}`, { ...PARAMS, tags: { name: `appointments ${status}` } });
+  const appointments = http.get(`${BASE_URL}/api/appointments?status=${status}&page=${page}&pageSize=${PAGE_SIZE}`, { ...PARAMS, tags: { name: `appointments ${status}` } });
   check(appointments, { 'appointments 200': (r) => r.status === 200 });
 
   sleep(Math.random() * 0.5);
