@@ -9,6 +9,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Redis: redis:6379,connectTimeout=1000
       ConnectionStrings__PawTrack: Host=postgres;Port=5432;Database=pawtrack;Username=pawtrack;Password=pawtrack;Maximum Pool Size=15;Timeout=3;Command Timeout=10
+      # Serves /api/diagnostics/load, which the load tests read to compare peak usage against the limits.
+      LoadDiagnostics__Enabled: "true"
     depends_on:
       postgres:
         condition: service_healthy

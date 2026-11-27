@@ -3,11 +3,14 @@ using PawTrack.Web.Data;
 
 namespace PawTrack.Web.Queries;
 
-public class VetVisitQueries(PawTrackDbContext db)
+// Each query creates and disposes its own DbContext: these run inside HybridCache factories, which can outlive the request
+// that started them, and a request-scoped context would be disposed mid-query, leaking its connection from the pool.
+public class VetVisitQueries(IDbContextFactory<PawTrackDbContext> dbFactory)
 {
     public async Task<PagedResult<VisitRow>> GetVisitsAsync(
         int page, int pageSize, string? species, string? city, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var query =
             from visit in db.VetVisits
             join pet in db.Pets on visit.PetId equals pet.Id
@@ -47,6 +50,7 @@ public class VetVisitQueries(PawTrackDbContext db)
     public async Task<PagedResult<OwnerSummaryRow>> GetOwnerSummariesAsync(
         int page, int pageSize, string? city, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var owners = db.Users.Where(u => city == null || u.City == city);
         var total = await owners.CountAsync(ct);
 

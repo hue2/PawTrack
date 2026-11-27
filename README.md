@@ -90,3 +90,33 @@ With the default data scale it reproduces a cascading failure at about 65 second
 2. The app opens a new Redis connection per request (`RedisServiceCollectionExtensions.cs`) and holds it for the whole request, so slow requests use up Redis's 50-client limit (`--maxclients 50`).
 3. Redis refuses new connections, so requests that would have been cache hits also go to the database.
 4. The database's connection pool (15 connections) runs out, and requests fail with "connection pool has been exhausted" or time out.
+
+### Crawling uncached pages
+
+`loadtest/crawl-pending.js` runs a crawler that requests visits pages nobody has opened (every request misses the cache) alongside a staff member opening the pending appointments queue once a second. Pending is never cached, so it needs a free database connection on every request.
+
+```sh
+docker compose up -d --build web
+docker compose run --rm --no-deps k6 run /scripts/crawl-pending.js
+```
+
+`--no-deps` stops the run from recreating the web container. On Windows with Git Bash, prefix the command with `MSYS_NO_PATHCONV=1` so `/scripts/...` isn't rewritten as a Windows path.
+
+The test passes only if every pending request succeeds with a p95 under 500 ms, and the app's peak usage stays within its limits. The peaks come from `/api/diagnostics/load`, which is only served when `LoadDiagnostics:Enabled` is set (the compose web service sets it). At the end the test prints a report:
+
+| Row | Allowed | What it measures |
+|---|---|---|
+| DB connections in use | below the pool size | Peak connections the app had open, including the pending queue's |
+| Cache-miss queries let through, all clients | `CacheMissLimits:Global`, or a target of 10 | Peak cache-miss queries running at once |
+| Cache-miss queries let through, one client | `CacheMissLimits:PerClient`, or a target of 5 | The same, for the busiest IP address |
+| Pending queue failures, p95 | 0, under 500 ms | The staff member's requests |
+
+Without limits configured, the queries are measured against the targets. On the current code every row fails: the crawler takes all 15 connections and about half the pending requests fail.
+
+The app identifies clients by IP address, and every k6 container gets its own. To crawl from several addresses, start the run above, then a few seconds later start more containers with `CRAWL_ONLY=1`. They add crawlers but leave the staff member, the reset and the report to the first run:
+
+```sh
+docker compose run --rm --no-deps -e CRAWL_ONLY=1 k6 run --quiet /scripts/crawl-pending.js
+```
+
+`CRAWLERS` sets the number of crawler users per container (default 40).

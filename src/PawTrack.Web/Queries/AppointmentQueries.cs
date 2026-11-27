@@ -4,12 +4,14 @@ using PawTrack.Web.Domain;
 
 namespace PawTrack.Web.Queries;
 
-public class AppointmentQueries(PawTrackDbContext db)
+// Creates its own DbContext per query, like VetVisitQueries, because the upcoming list runs inside a HybridCache factory.
+public class AppointmentQueries(IDbContextFactory<PawTrackDbContext> dbFactory)
 {
     // Appointments with the given status that haven't happened yet, soonest first.
     public async Task<PagedResult<AppointmentRow>> GetFutureAsync(
         AppointmentStatus status, int page, int pageSize, CancellationToken ct = default)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var now = DateTime.UtcNow;
 
         var query =

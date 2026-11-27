@@ -9,8 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
 
-builder.Services.AddDbContext<PawTrackDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("PawTrack")));
+builder.Services.AddSingleton<LoadDiagnostics>();
+builder.Services.AddSingleton<ConnectionUsageInterceptor>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddDbContextFactory<PawTrackDbContext>((services, options) => options
+    .UseNpgsql(builder.Configuration.GetConnectionString("PawTrack"))
+    .AddInterceptors(services.GetRequiredService<ConnectionUsageInterceptor>()));
 builder.Services.AddScoped<VetVisitQueries>();
 builder.Services.AddScoped<AppointmentQueries>();
 builder.Services.AddRedisCache(builder.Configuration);
@@ -25,6 +29,7 @@ if (!app.Environment.IsDevelopment())
 app.MapStaticAssets();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapLoadDiagnostics(app.Configuration);
 
 var api = app.MapGroup("/api");
 
