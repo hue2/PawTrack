@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:5064';
 
 // Hot keys: most users land on the first few pages with the default page size and no filters, so traffic concentrates
 // on a handful of cache keys. When one of them is missing (cold start, or expiry after the 1-minute TTL), every request

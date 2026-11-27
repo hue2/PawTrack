@@ -1,4 +1,5 @@
 using StackExchange.Redis;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 
 namespace PawTrack.Web.Infrastructure;
 
@@ -9,22 +10,18 @@ public static class RedisServiceCollectionExtensions
         var connectionString = configuration.GetConnectionString("Redis")
             ?? throw new InvalidOperationException("ConnectionStrings:Redis is not configured.");
 
-        services.AddScoped<IConnectionMultiplexer>(sp =>
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
-            var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("PawTrack.Redis");
-            try
-            {
-                return ConnectionMultiplexer.Connect(connectionString);
-            }
-            catch (RedisConnectionException ex)
-            {
-                logger.LogError(ex, "Redis connection exhausted: unable to open a connection to {Endpoint}", connectionString);
-                throw;
-            }
+            var options = ConfigurationOptions.Parse(connectionString);
+            options.AbortOnConnectFail = false;
+            options.BacklogPolicy = BacklogPolicy.FailFast;
+            return ConnectionMultiplexer.Connect(connectionString);
         });
-
-        services.AddScoped<ICacheStore, RedisCache>();
-
+        services.AddStackExchangeRedisCache(_ => { });
+        services.AddOptions<RedisCacheOptions>().Configure<IConnectionMultiplexer>((options, multiplexer) =>
+            options.ConnectionMultiplexerFactory = () => Task.FromResult(multiplexer));
+        services.AddSingleton<IHybridCacheStore, HybridCacheStore>();
+        services.AddHybridCache();
         return services;
     }
 }

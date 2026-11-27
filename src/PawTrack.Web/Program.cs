@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using PawTrack.Web.Data;
 using PawTrack.Web.Domain;
 using PawTrack.Web.Infrastructure;
@@ -27,27 +28,27 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 var api = app.MapGroup("/api");
 
-api.MapGet("/visits", (int? page, int? pageSize, string? species, string? city, ICacheStore cache, VetVisitQueries queries, CancellationToken ct) =>
+api.MapGet("/visits", (int? page, int? pageSize, string? species, string? city, IHybridCacheStore cache, VetVisitQueries queries, CancellationToken ct) =>
 {
     var p = Math.Max(page ?? 1, 1);
     var size = Math.Clamp(pageSize ?? 250, 1, 1000);
     species = NullIfEmpty(species);
     city = NullIfEmpty(city);
-    return cache.GetOrSetAsync($"visits:{p}:{size}:{species}:{city}", TimeSpan.FromMinutes(1),
-        () => queries.GetVisitsAsync(p, size, species, city, ct));
+    return cache.GetOrCreateAsync<PagedResult<VisitRow>>($"visits:{p}:{size}:{species}:{city}", TimeSpan.FromMinutes(1),
+        async (ct) => await queries.GetVisitsAsync(p, size, species, city, ct));
 });
 
-api.MapGet("/owners", (int? page, int? pageSize, string? city, ICacheStore cache, VetVisitQueries queries, CancellationToken ct) =>
+api.MapGet("/owners", (int? page, int? pageSize, string? city, IHybridCacheStore cache, VetVisitQueries queries, CancellationToken ct) =>
 {
     var p = Math.Max(page ?? 1, 1);
     var size = Math.Clamp(pageSize ?? 250, 1, 1000);
     city = NullIfEmpty(city);
-    return cache.GetOrSetAsync($"owners:{p}:{size}:{city}", TimeSpan.FromMinutes(1),
-        () => queries.GetOwnerSummariesAsync(p, size, city, ct));
+    return cache.GetOrCreateAsync<PagedResult<OwnerSummaryRow>>($"owners:{p}:{size}:{city}", TimeSpan.FromMinutes(1),
+        async (ct) => await queries.GetOwnerSummariesAsync(p, size, city, ct));
 });
 
 // status=upcoming (default) lists confirmed appointments; status=pending lists requests awaiting confirmation.
-api.MapGet("/appointments", async (string? status, int? page, int? pageSize, ICacheStore cache, AppointmentQueries queries, CancellationToken ct) =>
+api.MapGet("/appointments", async (string? status, int? page, int? pageSize, IHybridCacheStore cache, AppointmentQueries queries, CancellationToken ct) =>
 {
     AppointmentStatus? apptStatus = NullIfEmpty(status)?.ToLowerInvariant() switch
     {
@@ -62,8 +63,12 @@ api.MapGet("/appointments", async (string? status, int? page, int? pageSize, ICa
 
     var p = Math.Max(page ?? 1, 1);
     var size = Math.Clamp(pageSize ?? 250, 1, 1000);
-    return Results.Ok(await cache.GetOrSetAsync($"appointments:{s}:{p}:{size}", TimeSpan.FromMinutes(1),
-        () => queries.GetFutureAsync(s, p, size, ct)));
+    if (s == AppointmentStatus.Pending)
+    {
+        return Results.Ok(await queries.GetFutureAsync(s, p, size, ct));
+    }
+    return Results.Ok(await cache.GetOrCreateAsync<PagedResult<AppointmentRow>>($"appointments:{s}:{p}:{size}", TimeSpan.FromSeconds(30),
+        async (ct) => await queries.GetFutureAsync(s, p, size, ct), HybridCacheEntryFlags.DisableLocalCache));
 });
 
 api.MapFallback(() => Results.NotFound());
