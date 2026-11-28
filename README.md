@@ -119,6 +119,8 @@ The test passes only if every pending request succeeds with a p95 under 500 ms, 
 | Cache-miss queries let through, one client | `CacheMissLimits:PerClient`, or a target of 5 | The same, for the busiest IP address |
 | Pending queue failures, p95 | 0, under 500 ms | The staff member's requests |
 
+To watch it live, open `http://localhost:8080/diagnostics/live` before starting the test: it shows connections in use against the pool, connections free, and cache-miss queries running, updated four times a second with the last 60 seconds as a chart.
+
 Without limits configured, the queries are measured against the targets. On the current code every row fails: the crawler takes all 15 connections and about half the pending requests fail.
 
 The app identifies clients by IP address, and every k6 container gets its own. To crawl from several addresses, start the run above, then a few seconds later start more containers with `CRAWL_ONLY=1`. They add crawlers but leave the staff member, the reset and the report to the first run:

@@ -74,6 +74,9 @@ public sealed class LoadDiagnostics : IDisposable
 
     public LoadSnapshot Snapshot() => new(peakConnections, peakMisses, peakClientMisses, busiestClient);
 
+    // What is in use right now, for watching a test live rather than reading its peaks afterwards.
+    public LoadNow Now() => new(Volatile.Read(ref connections), Volatile.Read(ref misses));
+
     // The pool reports its count per state (used or idle) when asked, so each sample adds up the used ones.
     private void SamplePool()
     {
@@ -131,6 +134,8 @@ public sealed class LoadDiagnostics : IDisposable
 
 public record LoadSnapshot(int PeakConnections, int PeakCacheMissQueries, int PeakClientCacheMissQueries, string? BusiestClient);
 
+public record LoadNow(int ConnectionsInUse, int CacheMissQueriesRunning);
+
 public static class LoadDiagnosticsExtensions
 {
     // Only for load tests: set LoadDiagnostics:Enabled to expose the peaks. The numbers aren't sensitive, but there's no
@@ -149,7 +154,9 @@ public static class LoadDiagnosticsExtensions
         var globalLimit = limits.GetValue<int?>("Global");
         var perClientLimit = limits.GetValue<int?>("PerClient");
         app.MapGet("/api/diagnostics/load", (LoadDiagnostics diagnostics) =>
-            Results.Ok(new { poolSize, globalLimit, perClientLimit, peaks = diagnostics.Snapshot() }));
+            Results.Ok(new { poolSize, globalLimit, perClientLimit, now = diagnostics.Now(), peaks = diagnostics.Snapshot() }));
+        // A page that polls the numbers above, to show connections filling up (or not) while a load test runs.
+        app.MapGet("/diagnostics/live", () => Results.Content(LoadDiagnosticsPage.Html, "text/html"));
         app.MapPost("/api/diagnostics/load/reset", (LoadDiagnostics diagnostics) =>
         {
             diagnostics.Reset();
