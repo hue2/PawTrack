@@ -3,6 +3,8 @@ name: pawtrack
 services:
   web:
     build: ./src/PawTrack.Web
+    # CPU caps keep the machine responsive during load tests; the bug needs connections held, not the machine saturated.
+    cpus: 2
     ports:
       - "8080:8080"
     environment:
@@ -19,6 +21,9 @@ services:
 
   postgres:
     image: postgres:17-alpine
+    # One core per query (no parallel workers) and a CPU cap, so a crawl holds connections without taking over the machine.
+    command: ["postgres", "-c", "max_parallel_workers_per_gather=0"]
+    cpus: ${DB_CPUS:-2}
     shm_size: 1gb
     environment:
       POSTGRES_DB: pawtrack
@@ -53,6 +58,7 @@ services:
   k6:
     image: grafana/k6:0.54.0
     profiles: ["loadtest"]
+    cpus: 1
     volumes:
       - ./loadtest:/scripts:ro
     environment:

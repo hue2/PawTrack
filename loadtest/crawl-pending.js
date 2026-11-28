@@ -68,6 +68,8 @@ export function crawl() {
   const res = http.get(`${BASE_URL}/api/visits?page=${page}&pageSize=100`, { ...PARAMS, tags: { name: 'crawler' } });
   if (res.status === 429) crawler429.add(1);
   if (res.status === 503) crawler503.add(1);
+  // Waits as long as Retry-After asks once rejected, rather than retrying in a tight loop that only loads the machine.
+  if (res.status === 429 || res.status === 503) sleep(Number(res.headers['Retry-After']) || 1);
 }
 
 export function pendingQueue() {
