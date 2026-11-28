@@ -1,13 +1,12 @@
 using System.Collections.Concurrent;
-using System.Data.Common;
-using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Diagnostics.Metrics;
 using Npgsql;
 
 namespace PawTrack.Web.Infrastructure;
 
 // Counts what is actually running, independently of CacheMissLimiter, so a load test can compare peaks against the
 // configured limits, and so the same numbers can be collected from code that has no limits at all.
-public sealed class LoadDiagnostics
+public sealed class LoadDiagnostics : IDisposable
 {
     private readonly ConcurrentDictionary<string, int> missesByClient = new();
     private int connections, peakConnections;
@@ -15,9 +14,35 @@ public sealed class LoadDiagnostics
     private int peakClientMisses;
     private string? busiestClient;
     private readonly Lock busiestLock = new();
+    private readonly Lock sampleLock = new();
+    private readonly MeterListener? poolListener;
+    private readonly Timer? poolSampler;
+    private long usedInSample;
 
-    public void ConnectionOpened() => RaisePeak(ref peakConnections, Interlocked.Increment(ref connections));
-    public void ConnectionClosed() => Interlocked.Decrement(ref connections);
+    public LoadDiagnostics(IConfiguration configuration)
+    {
+        if (!configuration.GetValue<bool>("LoadDiagnostics:Enabled"))
+        {
+            return;
+        }
+
+        // Connections in use come from Npgsql's own pool count rather than from counting opens and closes, which misses
+        // connections Npgsql closes itself after a cancelled query. The pool's count can never exceed the pool size.
+        poolListener = new MeterListener
+        {
+            InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Meter.Name == "Npgsql" && instrument.Name == "db.client.connection.count")
+                {
+                    listener.EnableMeasurementEvents(instrument);
+                }
+            },
+        };
+        poolListener.SetMeasurementEventCallback<int>((_, value, tags, _) => AddIfUsed(value, tags));
+        poolListener.SetMeasurementEventCallback<long>((_, value, tags, _) => AddIfUsed(value, tags));
+        poolListener.Start();
+        poolSampler = new Timer(_ => SamplePool(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(20));
+    }
 
     // Call once a cache-miss query is allowed to run (after any limiter), and dispose when it finishes.
     public IDisposable CacheMissStarted(string client)
@@ -49,6 +74,43 @@ public sealed class LoadDiagnostics
 
     public LoadSnapshot Snapshot() => new(peakConnections, peakMisses, peakClientMisses, busiestClient);
 
+    // The pool reports its count per state (used or idle) when asked, so each sample adds up the used ones.
+    private void SamplePool()
+    {
+        if (!sampleLock.TryEnter())
+        {
+            return;
+        }
+        try
+        {
+            usedInSample = 0;
+            poolListener!.RecordObservableInstruments();
+            Volatile.Write(ref connections, (int)usedInSample);
+            RaisePeak(ref peakConnections, (int)usedInSample);
+        }
+        finally
+        {
+            sampleLock.Exit();
+        }
+    }
+
+    private void AddIfUsed(long value, ReadOnlySpan<KeyValuePair<string, object?>> tags)
+    {
+        foreach (var tag in tags)
+        {
+            if (tag.Key.EndsWith(".state", StringComparison.Ordinal) && tag.Value as string == "used")
+            {
+                usedInSample += value;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        poolSampler?.Dispose();
+        poolListener?.Dispose();
+    }
+
     private static void RaisePeak(ref int peak, int value)
     {
         int current;
@@ -68,33 +130,6 @@ public sealed class LoadDiagnostics
 }
 
 public record LoadSnapshot(int PeakConnections, int PeakCacheMissQueries, int PeakClientCacheMissQueries, string? BusiestClient);
-
-// Counts database connections the app has open, including ones that never go through the cache, like the pending queue.
-public sealed class ConnectionUsageInterceptor(LoadDiagnostics diagnostics) : DbConnectionInterceptor
-{
-    public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData) =>
-        diagnostics.ConnectionOpened();
-
-    public override Task ConnectionOpenedAsync(DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
-    {
-        diagnostics.ConnectionOpened();
-        return Task.CompletedTask;
-    }
-
-    // Counted as closed when closing starts, before the connection goes back to the pool, so a request that takes it
-    // straight away can't be counted while this one still is.
-    public override InterceptionResult ConnectionClosing(DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
-    {
-        diagnostics.ConnectionClosed();
-        return result;
-    }
-
-    public override ValueTask<InterceptionResult> ConnectionClosingAsync(DbConnection connection, ConnectionEventData eventData, InterceptionResult result)
-    {
-        diagnostics.ConnectionClosed();
-        return ValueTask.FromResult(result);
-    }
-}
 
 public static class LoadDiagnosticsExtensions
 {

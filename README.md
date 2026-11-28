@@ -114,7 +114,7 @@ The test passes only if every pending request succeeds with a p95 under 500 ms, 
 
 | Row | Allowed | What it measures |
 |---|---|---|
-| DB connections in use | below the pool size | Peak connections the app had open, including the pending queue's |
+| DB connections in use | below the pool size | Peak connections in use, read from Npgsql's own pool count (sampled every 20 ms), including the pending queue's |
 | Cache-miss queries let through, all clients | `CacheMissLimits:Global`, or a target of 10 | Peak cache-miss queries running at once |
 | Cache-miss queries let through, one client | `CacheMissLimits:PerClient`, or a target of 5 | The same, for the busiest IP address |
 | Pending queue failures, p95 | 0, under 500 ms | The staff member's requests |

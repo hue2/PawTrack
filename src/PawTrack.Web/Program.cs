@@ -10,11 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
 
 builder.Services.AddSingleton<LoadDiagnostics>();
-builder.Services.AddSingleton<ConnectionUsageInterceptor>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddDbContextFactory<PawTrackDbContext>((services, options) => options
-    .UseNpgsql(builder.Configuration.GetConnectionString("PawTrack"))
-    .AddInterceptors(services.GetRequiredService<ConnectionUsageInterceptor>()));
+builder.Services.AddDbContextFactory<PawTrackDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("PawTrack")));
 builder.Services.AddScoped<VetVisitQueries>();
 builder.Services.AddScoped<AppointmentQueries>();
 builder.Services.AddRedisCache(builder.Configuration);
