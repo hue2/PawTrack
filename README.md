@@ -115,9 +115,9 @@ The test passes only if every pending request succeeds with a p95 under 500 ms, 
 | Row | Allowed | What it measures |
 |---|---|---|
 | DB connections in use | below the pool size | Peak connections in use, read from Npgsql's own pool count (sampled every 20 ms), including the pending queue's |
-| Cache-miss queries let through, all clients | `CacheMissLimits:Global`, or a target of 10 | Peak cache-miss queries running at once |
-| Cache-miss queries let through, one client | `CacheMissLimits:PerClient`, or a target of 5 | The same, for the busiest IP address |
-| Pending queue failures, p95 | 0, under 500 ms | The staff member's requests |
+| Cache-miss queries running at once, all clients | `CacheMissLimits:Global`, or a target of 10 | Peak cache-miss queries running at the same time; without limits this includes queries waiting for a connection |
+| Cache-miss queries running at once, busiest client | `CacheMissLimits:PerClient`, or a target of 5 | The same, for the busiest IP address |
+| Staff requests to the pending list that failed, p95 time | 0, under 500 ms | The staff member's requests for the pending appointments list (about 30): a failure is an error response or no response within 10 seconds |
 
 To watch it live, open `http://localhost:8080/diagnostics/live` before starting the test: it shows connections in use against the pool, connections free, and cache-miss queries running, updated four times a second with the last 60 seconds as a chart.
 

@@ -129,10 +129,10 @@ function limitsReport(m) {
   const rows = [
     ['DB connections in use', `< ${pool} (pool)`, String(peakConnections),
       peakConnections < pool ? `ok, ${pool - peakConnections} always free` : 'EXCEEDED, none free'],
-    limitRow('Cache-miss queries let through, all clients', value('global_limit'), TARGET_GLOBAL, value('peak_cache_miss_queries')),
-    limitRow('Cache-miss queries let through, one client', value('per_client_limit'), TARGET_PER_CLIENT, value('peak_client_cache_miss_queries')),
-    ['Pending queue failures', '0', String(staffFailed?.passes ?? 0), staffFailed?.passes ? 'FAILED' : 'ok'],
-    ['Pending queue p95', '< 500 ms', `${Math.round(staffDuration?.['p(95)'] ?? 0)} ms`, (staffDuration?.['p(95)'] ?? 0) < 500 ? 'ok' : 'FAILED'],
+    limitRow('Cache-miss queries running at once, all clients', value('global_limit'), TARGET_GLOBAL, value('peak_cache_miss_queries')),
+    limitRow('Cache-miss queries running at once, busiest client', value('per_client_limit'), TARGET_PER_CLIENT, value('peak_client_cache_miss_queries')),
+    ['Staff requests to the pending list that failed', '0', String(staffFailed?.passes ?? 0), staffFailed?.passes ? 'FAILED' : 'ok'],
+    ['Staff requests to the pending list, p95 time', '< 500 ms', `${Math.round(staffDuration?.['p(95)'] ?? 0)} ms`, (staffDuration?.['p(95)'] ?? 0) < 500 ? 'ok' : 'FAILED'],
     ['Crawler requests rejected', '-', `429: ${count('crawler_429')}, 503: ${count('crawler_503')}`, ''],
   ];
 
