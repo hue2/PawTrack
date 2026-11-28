@@ -1,12 +1,14 @@
-#!/bin/sh
-# Copies the restored backup so the tables hold PAWTRACK_SCALE times the data, making cache misses expensive.
-# The postgres entrypoint sources this file, so it must not call exit.
+-- Copies the restored backup so the tables hold PAWTRACK_SCALE times the data, making cache misses expensive.
+-- A .sql file rather than a shell script: the postgres entrypoint always runs .sql files through psql, whereas a .sh
+-- file it finds executable is run as a program, which some Docker Desktop file shares refuse ("bad interpreter").
 
-scale="${PAWTRACK_SCALE:-1}"
+\set scale 1
+\getenv scale PAWTRACK_SCALE
+SELECT :scale > 1 AS do_scale \gset
 
-if [ "$scale" -gt 1 ]; then
-    echo "Scaling PawTrack data ${scale}x..."
-    psql -v ON_ERROR_STOP=1 -v scale="$scale" --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'EOSQL'
+\if :do_scale
+\echo Scaling PawTrack data :scale x...
+
 CREATE TEMP TABLE base AS
 SELECT (SELECT max("Id") FROM "Users") AS users,
        (SELECT max("Id") FROM "Pets") AS pets,
@@ -30,5 +32,4 @@ SELECT setval(pg_get_serial_sequence('"Pets"', 'Id'), max("Id")) FROM "Pets";
 SELECT setval(pg_get_serial_sequence('"VetVisits"', 'Id'), max("Id")) FROM "VetVisits";
 
 ANALYZE;
-EOSQL
-fi
+\endif

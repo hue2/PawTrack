@@ -11,7 +11,7 @@ User 1--* Pet 1--* VetVisit *--1 Veterinarian
 Data lives in PostgreSQL. The first time the `postgres` compose service starts with an empty volume, it:
 
 1. restores `db/init/01-pawtrack.sql.gz`, a `pg_dump` with about 5,000 users, 12,500 pets, 40 vets and 56,000 visits;
-2. runs `db/init/02-scale.sh`, which copies that data `PAWTRACK_SCALE` times (default 50: about 250,000 users, 630,000 pets and 2.8 million visits, 570 MB). Startup takes about a minute;
+2. runs `db/init/02-scale.sql`, which copies that data `PAWTRACK_SCALE` times (default 50: about 250,000 users, 630,000 pets and 2.8 million visits, 570 MB). Startup takes about a minute;
 3. runs `db/init/03-appointments.sql`, which creates the `Appointments` table and gives about one in five pets an appointment in the next 60 days (about 70% confirmed, 30% pending). Appointments are generated relative to the current date rather than stored in the backup, so they don't go stale.
 
 | Endpoint | Query | Used by |
@@ -99,6 +99,14 @@ With the default data scale it reproduces a cascading failure at about 65 second
 docker compose up -d --build web
 docker compose run --rm --no-deps k6 run /scripts/crawl-pending.js
 ```
+
+The failure needs the default data scale, so the crawler's queries are slow enough to hold every connection. Check before running:
+
+```sh
+docker compose exec postgres psql -U pawtrack -d pawtrack -c 'select (select count(*) from "VetVisits") visits, (select count(*) from "Pets") pets, (select count(*) from "Appointments") appointments;'
+```
+
+Expect about 2.8 million visits, 628,000 pets and 125,000 appointments. Much smaller numbers mean the database volume was created at a smaller scale; it only applies when the volume is first created, so run `docker compose down -v` (this deletes the database volume) and start again.
 
 `--no-deps` stops the run from recreating the web container. On Windows with Git Bash, prefix the command with `MSYS_NO_PATHCONV=1` so `/scripts/...` isn't rewritten as a Windows path.
 
